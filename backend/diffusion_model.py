@@ -6,6 +6,7 @@ Manages the time-evolution of the temperature field, combining the physical
 source, cooling, boundary loss, and heat spreading.
 """
 import numpy as np
+import math
 
 def apply_temporal_decay(
     T: np.ndarray,
@@ -27,7 +28,10 @@ def apply_temporal_decay(
         The returned field represents the temperature field after temporal cooling 
         toward ambient temperature. The data remains real-valued.
     """
-    pass
+    current_difference = T - ambient_temp
+    new_difference = current_difference * math.exp(-dt* decay_rate)
+    return ambient_temp + new_difference
+
 
 def apply_boundary_loss(
     T: np.ndarray,
@@ -45,7 +49,14 @@ def apply_boundary_loss(
         The returned field represents the temperature after boundary heat loss.
         Only the boundary behavior is conceptually affected. The result remains real-valued.
     """
-    pass
+    rows, cols = T.shape
+    T[0,:] = T[0,:] * (1-loss_rate)
+    T[-1,:] = T[-1,:] * (1-loss_rate)
+    T[1:-1,0] = T[1:-1,0] * (1-loss_rate)
+    T[1:-1, -1] = T[1:-1, -1] * (1-loss_rate)
+    return T
+
+
 
 def set_diffusion_coefficient(D: float) -> float:
     """
@@ -58,12 +69,15 @@ def set_diffusion_coefficient(D: float) -> float:
         float: The validated scalar diffusion coefficient, ready to be passed 
         into the diffusion-kernel generation stage.
     """
-    pass
+    if not D<0:
+        return float(D)
+    return 0.0
 
 def step(
     T: np.ndarray,
     S: np.ndarray,
     kernel: np.ndarray,
+    ambient_temp:float,
     decay_rate: float,
     boundary_loss_rate: float,
     dt: float,
@@ -88,11 +102,16 @@ def step(
         The conceptual update includes source spreading, accumulation, temporal decay, 
         and boundary loss.
     """
-    pass
+    spread = convolve_fn(S, kernel)
+    T= (T+spread).copy()
+    T = apply_temporal_decay(T, ambient_temp, decay_rate,dt)
+    T = apply_boundary_loss(T,boundary_loss_rate)
+    return T
 
 def run_simulation(
     T: np.ndarray,
     get_source_fn,
+    ambient_temp,
     kernel: np.ndarray,
     decay_rate: float,
     boundary_loss_rate: float,
@@ -119,4 +138,9 @@ def run_simulation(
         Each list element represents the temperature field at one simulation timestep.
         Contract: The initial field T is included as the first element in the returned sequence.
     """
-    pass
+    sim = []
+    sim.append(T)
+    for i in range(num_steps) :
+        T = step(T,get_source_fn(),kernel,ambient_temp,decay_rate,boundary_loss_rate,dt,convolve_fn)
+        sim.append(T)
+    return sim
