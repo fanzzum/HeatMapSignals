@@ -19,7 +19,7 @@ def compute_fft2(field: np.ndarray) -> np.ndarray:
         Fourier transform / FFT coefficients, representing the signal in the 
         frequency domain.
     """
-    pass
+    return np.fft.fft2(np.asarray(field, dtype=np.float64))
 
 def compute_ifft2(field_freq: np.ndarray) -> np.ndarray:
     """
@@ -36,7 +36,7 @@ def compute_ifft2(field_freq: np.ndarray) -> np.ndarray:
         Since the physical temperature/source field is real-valued, the returned 
         result is expected to be explicitly real-valued.
     """
-    pass
+    return np.real(np.fft.ifft2(np.asarray(field_freq)))
 
 def convolve_via_fft(
     S: np.ndarray,
@@ -55,7 +55,18 @@ def convolve_via_fft(
         through the Fourier-domain interpretation. Its mathematical contract is equivalent 
         to the result obtained from direct spatial convolution.
     """
-    pass
+    source = np.asarray(S, dtype=np.float64)
+    kernel = np.asarray(h, dtype=np.float64)
+    height, width = source.shape
+    kernel_height, kernel_width = kernel.shape
+    full_shape = (height + kernel_height - 1, width + kernel_width - 1)
+
+    source_freq = np.fft.fft2(source, s=full_shape)
+    kernel_freq = np.fft.fft2(kernel, s=full_shape)
+    full_convolution = np.real(np.fft.ifft2(source_freq * kernel_freq))
+    start_y = kernel_height // 2
+    start_x = kernel_width // 2
+    return full_convolution[start_y:start_y + height, start_x:start_x + width]
 
 def get_power_spectrum(field: np.ndarray) -> np.ndarray:
     """
@@ -70,4 +81,6 @@ def get_power_spectrum(field: np.ndarray) -> np.ndarray:
         Fourier spectrum (power spectrum) to describe the spatial-frequency content.
         The zero-frequency component is placed at the center of the returned array.
     """
-    pass
+    magnitude = np.abs(compute_fft2(field))
+    spectrum = np.log1p(magnitude)
+    return np.fft.fftshift(spectrum).astype(np.float64)

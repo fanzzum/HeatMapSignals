@@ -20,7 +20,7 @@ def create_field(width: int, height: int, ambient_temp: float = 20.0) -> np.ndar
         Each element represents the temperature at one sampled spatial location.
         Every initial cell contains the ambient temperature.
     """
-    pass
+    return np.full((height, width), ambient_temp, dtype=np.float64)
 
 def reset_field(T: np.ndarray, ambient_temp: float = 20.0) -> np.ndarray:
     """
@@ -35,7 +35,7 @@ def reset_field(T: np.ndarray, ambient_temp: float = 20.0) -> np.ndarray:
         Every returned cell represents the reset ambient temperature.
         Contract: Returns a new array.
     """
-    pass
+    return np.full_like(np.asarray(T, dtype=np.float64), ambient_temp, dtype=np.float64)
 
 def get_temperature_at(T: np.ndarray, x: int, y: int) -> float:
     """
@@ -49,4 +49,4 @@ def get_temperature_at(T: np.ndarray, x: int, y: int) -> float:
     Returns:
         float: The temperature value at that grid location.
     """
-    pass
+    return float(T[y, x])

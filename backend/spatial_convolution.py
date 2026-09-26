@@ -29,30 +29,25 @@ def convolve_2d(
     H, W = field.shape
     kh, kw = kernel.shape
 
-    # True convolution flips the kernel in both axes before sliding it
-    # (as opposed to cross-correlation, which does not flip).
-    flipped = kernel[::-1, ::-1]
+    # Use scipy if available for fast convolution, otherwise fall back to
+    # numpy FFT-based approach (much faster than the nested Python loop).
+    try:
+        from scipy.signal import fftconvolve
+        result = fftconvolve(field, kernel, mode='same')
+        return result
+    except ImportError:
+        pass
 
-    # "Same"-shape output: zero-pad the field so the kernel's centre can
-    # visit every original pixel, including near the borders. For an
-    # odd-sized kernel this pad is symmetric; for an even-sized kernel the
-    # extra pixel goes on the trailing edge, matching NumPy/​SciPy's
-    # "same"-mode convention.
-    pad_top = kh // 2
-    pad_bottom = kh - 1 - pad_top
-    pad_left = kw // 2
-    pad_right = kw - 1 - pad_left
-    padded = np.pad(
-        field,
-        ((pad_top, pad_bottom), (pad_left, pad_right)),
-        mode="constant",
-        constant_values=0.0,
-    )
+    # FFT-based "same"-mode convolution using only numpy.
+    # This is mathematically equivalent to the direct spatial convolution
+    # but runs in O(N log N) instead of O(N * K^2).
+    full_h = H + kh - 1
+    full_w = W + kw - 1
+    field_freq = np.fft.rfft2(field, s=(full_h, full_w))
+    kernel_freq = np.fft.rfft2(kernel, s=(full_h, full_w))
+    full_conv = np.fft.irfft2(field_freq * kernel_freq, s=(full_h, full_w))
 
-    result = np.zeros((H, W), dtype=np.float64)
-    for r in range(H):
-        for c in range(W):
-            window = padded[r:r + kh, c:c + kw]
-            result[r, c] = np.sum(window * flipped)
-
-    return result
+    # Extract "same"-sized output (centered on the kernel's anchor)
+    start_y = kh // 2
+    start_x = kw // 2
+    return full_conv[start_y:start_y + H, start_x:start_x + W]

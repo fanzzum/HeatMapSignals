@@ -86,10 +86,19 @@ def step(
     """
     Performs a single simulation timestep update.
     
+    The physical model:
+    1. Add the heat source contribution (scaled by dt) to the field.
+    2. Diffuse the entire temperature field by convolving with the diffusion kernel.
+       This makes the diffusion coefficient visibly meaningful — higher D spreads
+       all existing heat more broadly each timestep.
+    3. Apply temporal decay (cooling toward ambient).
+    4. Apply boundary loss.
+    
     Args:
         T: The current 2D temperature field.
         S: The current 2D candle source array.
         kernel: The spatial diffusion kernel.
+        ambient_temp: The ambient temperature.
         decay_rate: The rate of temporal cooling.
         boundary_loss_rate: The rate of heat loss at the edges.
         dt: The time step duration.
@@ -99,14 +108,18 @@ def step(
     Returns:
         np.ndarray: A 2D floating-point NumPy array of exactly the same shape as T.
         The returned field represents the temperature after one simulation timestep.
-        The conceptual update includes source spreading, accumulation, temporal decay, 
-        and boundary loss.
     """
-    spread = convolve_fn(S, kernel)
-    T= (T+spread).copy()
-    T = apply_temporal_decay(T, ambient_temp, decay_rate,dt)
-    T = apply_boundary_loss(T,boundary_loss_rate)
-    return T
+    # 1. Add source contribution (scaled by dt for temporal consistency)
+    T_new = (T + S * dt).copy()
+    # 2. Diffuse the ENTIRE temperature field — this is what makes the diffusion
+    #    coefficient visually meaningful. The kernel redistributes existing heat
+    #    spatially, so higher D -> broader spreading of the whole field.
+    T_new = convolve_fn(T_new, kernel)
+    # 3. Cool toward ambient
+    T_new = apply_temporal_decay(T_new, ambient_temp, decay_rate, dt)
+    # 4. Boundary loss
+    T_new = apply_boundary_loss(T_new, boundary_loss_rate)
+    return T_new
 
 def run_simulation(
     T: np.ndarray,
