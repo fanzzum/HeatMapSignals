@@ -84,3 +84,39 @@ def get_power_spectrum(field: np.ndarray) -> np.ndarray:
     magnitude = np.abs(compute_fft2(field))
     spectrum = np.log1p(magnitude)
     return np.fft.fftshift(spectrum).astype(np.float64)
+
+
+def get_phase_spectrum(field: np.ndarray) -> np.ndarray:
+    """
+    Computes the phase spectrum of a spatial field.
+    """
+    phase = np.angle(compute_fft2(field))
+    return np.fft.fftshift(phase).astype(np.float64)
+
+
+def apply_high_pass(field: np.ndarray, cutoff_radius: float = 5.0) -> np.ndarray:
+    """
+    Applies a sharp high-pass filter in the frequency domain.
+    Removes low frequencies (center of the shifted FFT).
+    """
+    freq = np.fft.fftshift(compute_fft2(field))
+    h, w = freq.shape
+    cy, cx = h // 2, w // 2
+    y, x = np.ogrid[:h, :w]
+    mask = (x - cx)**2 + (y - cy)**2 <= cutoff_radius**2
+    freq[mask] = 0.0 # Zero out low frequencies
+    return compute_ifft2(np.fft.ifftshift(freq))
+
+
+def apply_low_pass(field: np.ndarray, cutoff_radius: float = 10.0) -> np.ndarray:
+    """
+    Applies a sharp low-pass filter in the frequency domain.
+    Removes high frequencies (edges of the shifted FFT).
+    """
+    freq = np.fft.fftshift(compute_fft2(field))
+    h, w = freq.shape
+    cy, cx = h // 2, w // 2
+    y, x = np.ogrid[:h, :w]
+    mask = (x - cx)**2 + (y - cy)**2 > cutoff_radius**2
+    freq[mask] = 0.0 # Zero out high frequencies
+    return compute_ifft2(np.fft.ifftshift(freq))

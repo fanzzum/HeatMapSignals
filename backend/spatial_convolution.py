@@ -29,25 +29,22 @@ def convolve_2d(
     H, W = field.shape
     kh, kw = kernel.shape
 
-    # Use scipy if available for fast convolution, otherwise fall back to
-    # numpy FFT-based approach (much faster than the nested Python loop).
-    try:
-        from scipy.signal import fftconvolve
-        result = fftconvolve(field, kernel, mode='same')
-        return result
-    except ImportError:
-        pass
-
-    # FFT-based "same"-mode convolution using only numpy.
-    # This is mathematically equivalent to the direct spatial convolution
-    # but runs in O(N log N) instead of O(N * K^2).
-    full_h = H + kh - 1
-    full_w = W + kw - 1
-    field_freq = np.fft.rfft2(field, s=(full_h, full_w))
-    kernel_freq = np.fft.rfft2(kernel, s=(full_h, full_w))
-    full_conv = np.fft.irfft2(field_freq * kernel_freq, s=(full_h, full_w))
-
-    # Extract "same"-sized output (centered on the kernel's anchor)
-    start_y = kh // 2
-    start_x = kw // 2
-    return full_conv[start_y:start_y + H, start_x:start_x + W]
+    # For pedagogical reasons, if "Direct" is chosen, we purposefully do not 
+    # use scipy or FFT to demonstrate the massive O(N^2 K^2) cost compared 
+    # to O(N log N) FFT.
+    
+    # Pad the field to handle boundaries (wrap mode)
+    pad_y, pad_x = kh // 2, kw // 2
+    padded = np.pad(field, ((pad_y, pad_y), (pad_x, pad_x)), mode='wrap')
+    
+    result = np.zeros((H, W), dtype=np.float64)
+    
+    # True direct convolution O(N^2 K^2)
+    # This intentionally demonstrates computational expense!
+    for y in range(H):
+        for x in range(W):
+            # Extract region and multiply by kernel (sliding window)
+            region = padded[y:y+kh, x:x+kw]
+            result[y, x] = np.sum(region * kernel)
+            
+    return result

@@ -7,14 +7,16 @@ from backend.diffusion_model import step
 from backend.heat_source import generate_gaussian_source
 from backend.kernel import generate_diffusion_kernel
 from backend.spatial_convolution import convolve_2d
-from backend.frequency_domain import get_power_spectrum
+from backend.frequency_domain import get_power_spectrum, get_phase_spectrum, apply_high_pass, apply_low_pass, convolve_via_fft
 from backend.temperature_field import create_field, get_temperature_at, reset_field
+import time
 
-GRID_SIZE = 48
+GRID_SIZE = 100
 AMBIENT_TEMP = 20.0
 # Buffer zone: how far outside the grid a candle can be placed (in grid units)
 CANDLE_BUFFER = 12
-DEFAULTS = {"diffusion": 0.8, "sigma": 4.5, "cooling": 0.08, "boundary_loss": 0.01, "time_scale": 1.0}
+DEFAULTS = {"diffusion": 2.0, "sigma": 4.5, "cooling": 0.01, "boundary_loss": 0.005, "time_scale": 1.5, "convolution_mode": "fft", "spectrum_mode": "power", "active_filter": "none"}
+
 
 
 class Simulation:
@@ -23,10 +25,11 @@ class Simulation:
 
     def reset(self):
         self.settings = DEFAULTS.copy()
-        self.candles = [{"id": 1, "x": 24.0, "y": 24.0, "intensity": 88.0}]
+        self.candles = [{"id": 1, "x": GRID_SIZE / 2.0, "y": GRID_SIZE / 2.0, "intensity": 88.0}]
         self.selected_candle_id = 1
         self.field = create_field(GRID_SIZE, GRID_SIZE, AMBIENT_TEMP)
         self.step_number = 0
+        self.compute_time = 0.0
 
     def source_field(self):
         source = np.zeros_like(self.field)
@@ -43,7 +46,12 @@ class Simulation:
     def update(self, payload):
         if payload.get("reset"):
             self.reset()
-        self.settings.update({key: float(value) for key, value in payload.get("settings", {}).items() if key in DEFAULTS})
+        for key, value in payload.get("settings", {}).items():
+            if key in DEFAULTS:
+                if isinstance(DEFAULTS[key], float):
+                    self.settings[key] = float(value)
+                elif isinstance(DEFAULTS[key], str):
+                    self.settings[key] = str(value)
         if "candles" in payload:
             self.candles = [self.clamp_candle(candle) for candle in payload["candles"]]
             if self.candles and self.selected_candle_id not in {candle["id"] for candle in self.candles}:
@@ -68,17 +76,35 @@ class Simulation:
                 self.selected_candle_id = self.candles[0]["id"]
         if payload.get("clear_candles"):
             self.candles = []
+        if "apply_filter" in payload:
+            # Toggle filter
+            if self.settings.get("active_filter") == payload["apply_filter"]:
+                self.settings["active_filter"] = "none"
+            else:
+                self.settings["active_filter"] = payload["apply_filter"]
+
         if payload.get("running", True):
             source = self.source_field()
             dt = self.settings.get("time_scale", 1.0)
-            kernel = generate_diffusion_kernel(self.settings["diffusion"], dt, 7)
+            kernel = generate_diffusion_kernel(self.settings["diffusion"], dt, 9)
+            convolve_fn = convolve_2d if self.settings.get("convolution_mode") == "direct" else convolve_via_fft
+            
+            t0 = time.time()
             self.field = step(
                 self.field, source, kernel, AMBIENT_TEMP,
                 self.settings["cooling"],
                 self.settings.get("boundary_loss", 0.01),
                 dt,
-                convolve_2d,
+                convolve_fn,
             )
+            
+            # Apply active filter AFTER the step so it persists
+            if self.settings.get("active_filter") == "highpass":
+                self.field = apply_high_pass(self.field)
+            elif self.settings.get("active_filter") == "lowpass":
+                self.field = apply_low_pass(self.field)
+                
+            self.compute_time = (time.time() - t0) * 1000 # ms
             self.step_number += 1
 
     @staticmethod
@@ -107,9 +133,12 @@ class Simulation:
         selected = next((candle for candle in self.candles if candle["id"] == self.selected_candle_id), None)
         selected_x = max(0, min(GRID_SIZE - 1, round(selected["x"]))) if selected else 0
         selected_y = max(0, min(GRID_SIZE - 1, round(selected["y"]))) if selected else 0
+        
+        spectrum_data = get_power_spectrum(self.field) if self.settings.get("spectrum_mode", "power") == "power" else get_phase_spectrum(self.field)
+        
         return {
             "field": self.field.tolist(),
-            "spectrum": get_power_spectrum(self.field).tolist(),
+            "spectrum": spectrum_data.tolist(),
             "peak": float(np.max(self.field)),
             "minimum": float(np.min(self.field)),
             "average": float(np.mean(self.field)),
@@ -120,6 +149,7 @@ class Simulation:
             "step": self.step_number,
             "grid_size": GRID_SIZE,
             "candle_buffer": CANDLE_BUFFER,
+            "compute_time": self.compute_time,
         }
 
 
