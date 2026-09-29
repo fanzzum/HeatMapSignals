@@ -1,0 +1,252 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usetheme{default}
+\usefonttheme{professionalfonts}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{itemize items}[circle]
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{ragged2e}
+
+\definecolor{HeatBlue}{RGB}{20,70,150}
+\definecolor{HeatRed}{RGB}{205,45,35}
+\setbeamercolor{structure}{fg=HeatBlue}
+\setbeamercolor{frametitle}{fg=HeatBlue}
+
+\title{HeatMapSignals}
+\subtitle{Heat Diffusion as a 2D Signal Processing Problem}
+\author{Farhan Anjum \and Naeem Shuvo}
+\institute{Signals and Linear Systems}
+\date{September 2026}
+
+\newcommand{\img}[2][0.8\textwidth]{\includegraphics[width=#1,height=0.72\textheight,keepaspectratio]{#2}}
+
+\begin{document}
+
+% ------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Heat as a 2D Spatial Signal}
+\centering
+\img[0.82\textwidth]{heat_diffusion_over_time.png}
+
+\vspace{1mm}
+\begin{columns}[T,onlytextwidth]
+\column{0.32\textwidth}
+\small
+\begin{itemize}
+  \item The temperature field is a sampled 2D signal:
+  \[
+    T(x,y,t)
+  \]
+\end{itemize}
+
+\column{0.32\textwidth}
+\small
+\begin{itemize}
+  \item Each grid cell stores the temperature at that spatial location.
+\end{itemize}
+
+\column{0.36\textwidth}
+\small
+\begin{itemize}
+  \item In each timestep we model:
+  \begin{enumerate}
+    \item Add heat
+    \item Diffuse heat
+    \item Cool toward ambient
+    \item Boundary heat loss
+  \end{enumerate}
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Thermodynamic Decay \& Boundary Loss}
+\begin{columns}[T,onlytextwidth]
+\column{0.5\textwidth}
+\textbf{Temporal Cooling (Decay)}
+\vspace{2mm}
+\small
+\begin{itemize}
+  \item Heat dissipates into the ambient environment over time.
+  \item Follows Newton's Law of Cooling (exponential decay):
+  \[
+    \boxed{T_{new} = T_{amb} + (T - T_{amb}) e^{-\lambda \Delta t}}
+  \]
+  \item $\lambda$: Decay rate
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Boundary Loss}
+\vspace{2mm}
+\small
+\begin{itemize}
+  \item Heat escapes from the edges of the physical simulation grid.
+  \item Applied to boundary pixels (Robin/absorbing boundary condition):
+  \[
+    \boxed{T_{edge} \leftarrow T_{edge} \times (1 - \gamma)}
+  \]
+  \item $\gamma$: Boundary loss rate
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Why a Gaussian Kernel?}
+\centering
+\begin{columns}[c,onlytextwidth]
+\column{0.49\textwidth}
+\centering
+\img[0.98\textwidth]{heat_kernel_graph.png}
+
+\column{0.49\textwidth}
+\centering
+\img[0.98\textwidth]{heat_kernel_matrix.png}
+\end{columns}
+
+\vspace{-2mm}
+\begin{center}
+\small
+The fundamental solution of the 2D heat equation is Gaussian:
+\[
+\boxed{h(x,y,t)=\frac{1}{4\pi Dt}\exp\left(-\frac{x^2+y^2}{4Dt}\right)}
+\]
+\end{center}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Convolution: How Heat Spreads}
+\begin{columns}[c,onlytextwidth]
+\column{0.67\textwidth}
+\centering
+\img[1.0\textwidth]{kernel_sliding_convolution.png}
+
+\column{0.33\textwidth}
+\Large
+\begin{itemize}
+  \item The Gaussian kernel describes how heat at one location contributes to nearby locations.
+  \item Sliding the kernel over the entire spatial field performs 2D spatial convolution.
+\end{itemize}
+
+\[
+\boxed{S*h}
+\]
+\end{columns}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Why Fourier Transform?}
+\centering
+\img[0.92\textwidth]{spatial_frequency_domain.png}
+
+\vspace{-2mm}
+\begin{center}
+\large
+\textbf{Spatial domain} $\;\xrightarrow{\text{2D FFT}}\;$ \textbf{Frequency domain}
+\end{center}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Direct Convolution vs. FFT Convolution}
+\centering
+\img[0.92\textwidth]{direct_vs_fft.png}
+
+\vspace{1mm}
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\small
+\textbf{For our 100$\times$100 grid:}
+
+\vspace{1mm}
+\begin{tabular}{ll}
+Grid cells & $N=10,000$\\
+Kernel & $10\times10$\\
+Kernel elements & $K=100$\\
+\end{tabular}
+
+\vspace{2mm}
+\textbf{Direct spatial convolution}
+\[
+10,000\times100=\boxed{1,000,000}
+\]
+multiplications per frame.
+
+\column{0.52\textwidth}
+\small
+\textbf{FFT-based convolution}
+\[
+N\log_2N
+=10,000(13.28)
+\approx\boxed{132,800}
+\]
+operations per frame.
+
+\vspace{1mm}
+The source PDF reports the FFT approach as \textbf{$>50\times$ faster} in the live app.\textsuperscript{[1]}
+\end{columns}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{The Convolution Theorem}
+\centering
+\vspace{5mm}
+\Large
+\[
+\boxed{\mathcal{F}\{f*g\}=F(u,v)\,G(u,v)}
+\]
+
+\vspace{10mm}
+\large
+\textbf{Temperature / Source}
+\quad $\rightarrow$ \quad
+\textbf{2D FFT}
+\quad $\rightarrow$ \quad
+\textbf{Pointwise multiply}
+\quad $\rightarrow$ \quad
+\textbf{2D IFFT}
+
+\vspace{10mm}
+\large
+Instead of repeatedly sliding a kernel, convolution becomes \textbf{element-wise multiplication in the frequency domain}.\textsuperscript{[1]}
+\end{frame}
+
+% ------------------------------------------------
+\begin{frame}{Frequency-Domain Filtering}
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\centering
+\Large Low-pass
+\vspace{2mm}
+\begin{itemize}\small
+  \item Keeps low spatial frequencies.
+  \item Suppresses sharp spatial changes.
+  \item Produces a smoother / more blurred heat field.
+\end{itemize}
+
+\column{0.48\textwidth}
+\centering
+\Large High-pass
+\vspace{2mm}
+\begin{itemize}\small
+  \item Removes the DC/background component.
+  \item Keeps high spatial frequencies.
+  \item Highlights sharp spatial gradients and edges.
+\end{itemize}
+\end{columns}
+
+\vfill
+\begin{center}
+\large
+\textbf{Heat diffusion itself behaves as a spatial low-pass process.}\textsuperscript{[1]}
+\end{center}
+\end{frame}
+
+\end{document}

@@ -35,7 +35,8 @@ def apply_temporal_decay(
 
 def apply_boundary_loss(
     T: np.ndarray,
-    loss_rate: float
+    loss_rate: float,
+    ambient_temp: float
 ) -> np.ndarray:
     """
     Reduces the temperature at the edges of the field to model heat leaving the environment.
@@ -43,17 +44,17 @@ def apply_boundary_loss(
     Args:
         T: The current 2D temperature field as a NumPy ndarray.
         loss_rate: The rate at which heat is lost at the boundaries.
+        ambient_temp: The baseline ambient temperature.
         
     Returns:
         np.ndarray: A 2D floating-point NumPy array of the same shape as T.
         The returned field represents the temperature after boundary heat loss.
         Only the boundary behavior is conceptually affected. The result remains real-valued.
     """
-    rows, cols = T.shape
-    T[0,:] = T[0,:] * (1-loss_rate)
-    T[-1,:] = T[-1,:] * (1-loss_rate)
-    T[1:-1,0] = T[1:-1,0] * (1-loss_rate)
-    T[1:-1, -1] = T[1:-1, -1] * (1-loss_rate)
+    T[0,:] = ambient_temp + (T[0,:] - ambient_temp) * (1-loss_rate)
+    T[-1,:] = ambient_temp + (T[-1,:] - ambient_temp) * (1-loss_rate)
+    T[1:-1,0] = ambient_temp + (T[1:-1,0] - ambient_temp) * (1-loss_rate)
+    T[1:-1, -1] = ambient_temp + (T[1:-1, -1] - ambient_temp) * (1-loss_rate)
     return T
 
 
@@ -113,12 +114,13 @@ def step(
     T_new = (T + S * dt).copy()
     # 2. Diffuse the ENTIRE temperature field — this is what makes the diffusion
     #    coefficient visually meaningful. The kernel redistributes existing heat
-    #    spatially, so higher D -> broader spreading of the whole field.
-    T_new = convolve_fn(T_new, kernel)
+    #    spatially. By subtracting ambient_temp before convolution, we ensure
+    #    that zero-padding at the boundaries acts as an infinite ambient environment!
+    T_new = convolve_fn(T_new - ambient_temp, kernel) + ambient_temp
     # 3. Cool toward ambient
     T_new = apply_temporal_decay(T_new, ambient_temp, decay_rate, dt)
     # 4. Boundary loss
-    T_new = apply_boundary_loss(T_new, boundary_loss_rate)
+    T_new = apply_boundary_loss(T_new, boundary_loss_rate, ambient_temp)
     return T_new
 
 def run_simulation(

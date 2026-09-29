@@ -90,10 +90,19 @@ Imagine you take your small kernel, place it over the top-left corner of your te
 
 \begin{minipage}{\linewidth}
 \begin{lstlisting}
-def convolve_2d(field: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+def convolve_2d(field, kernel):
     # Direct convolution: Sliding the kernel over the field
-    from scipy.signal import convolve2d
-    return convolve2d(field, kernel, mode='same', boundary='wrap')
+    # (Demonstrates O(N^2 * K^2) computational expense!)
+    H, W = field.shape
+    kh, kw = kernel.shape
+    result = np.zeros((H, W))
+    
+    for y in range(H):
+        for x in range(W):
+            region = padded_field[y:y+kh, x:x+kw]
+            result[y, x] = np.sum(region * kernel)
+            
+    return result
 \end{lstlisting}
 \end{minipage}
 
