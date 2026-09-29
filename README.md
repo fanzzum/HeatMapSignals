@@ -1,10 +1,10 @@
-# HeatMapSignals 🔥
+# HeatMapSignals
 
 HeatMapSignals is an interactive, real-time 2D heat diffusion simulation built to demonstrate complex Digital Signal Processing (DSP) and Linear Systems concepts. It visually bridges the gap between raw physical models (the Heat Equation) and advanced frequency-domain analysis (Fourier Transforms, Convolution Theorem, and Spatial Filtering).
 
 ---
 
-## 🚀 Features
+## Features
 
 - **Real-Time Physics Engine:** Accurately simulates the 2D heat equation at 60 FPS, featuring thermodynamic decay (cooling) and boundary heat loss.
 - **Interactive Canvas:** Place, drag, and adjust the intensity of multiple heat sources (candles) in real-time.
@@ -14,7 +14,7 @@ HeatMapSignals is an interactive, real-time 2D heat diffusion simulation built t
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - **React.js** (via Vite)
@@ -27,7 +27,7 @@ HeatMapSignals is an interactive, real-time 2D heat diffusion simulation built t
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 You will need both **Node.js** (for the frontend) and **Python 3.8+** (for the DSP backend) installed on your system.
 
@@ -65,7 +65,7 @@ npm run dev
 
 ---
 
-## 🧠 Under the Hood (Signal Processing)
+## Under the Hood (Signal Processing)
 
 HeatMapSignals treats temperature as a continuous 2D spatial signal $T(x,y,t)$. The spread of heat is modeled mathematically as a **Linear Time-Invariant (LTI) system**. 
 
@@ -75,7 +75,7 @@ HeatMapSignals treats temperature as a continuous 2D spatial signal $T(x,y,t)$. 
 
 ---
 
-## 👨‍💻 Authors
+## Authors
 
 **Farhan Anjum** & **Naeem Shuvo**  
 *Developed for Signals and Linear Systems*
